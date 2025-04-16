@@ -1,10 +1,14 @@
 from flask import Flask, jsonify
 from db import collection
+from flask_cors import CORS
 
 app = Flask(__name__)
 
 #Route pour afficher les pokémons par "page"
 #Ici, on affiche les 50 premiers pokémons
+
+CORS(app)
+
 @app.route('/page/<int:page>', methods=['GET'])
 def get_pokemon_by_page(page):
     limit = 50

@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.env
+*.venv
+.env
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs & editors
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Python egg files
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Database dumps or temp files
+*.bak
+*.sql
+*.sqlite3
+
+# Misc
+pip-log.txt
+coverage.*
+htmlcov/
+.cache
+.tox
+nosetests.xml
+test-results.xml
+
+# MongoDB dumps
+dump/
