@@ -13,11 +13,13 @@ CORS(app)
 def get_pokemon_by_page(page):
     limit = 50
     skip = (page - 1) * limit
-    pokemons = list(collection.find().skip(skip).limit(limit))
-    
+    query = {'Name': {'$not': {'$regex': 'Mega '}}}
+
+    pokemons = list(collection.find(query).skip(skip).limit(limit))
+
     for p in pokemons:
         p['_id'] = str(p['_id'])
-    
+
     return jsonify(pokemons)
 
 
