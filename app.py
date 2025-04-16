@@ -88,5 +88,18 @@ def add_pokemon_to_team(username):
     )
     return jsonify({'message': f'{pokemon_name} added to {username}\'s team'})
 
+#Afficher l'user et son équipe 
+@app.route('/user/<username>', methods=['GET'])
+def get_user(username):
+    user = collection_users.find_one({'username': username})
+    if user:
+        return jsonify({
+            'username': user['username'],
+            'team': user['team'],
+        })
+    else:
+        return jsonify({'error': 'User not found'}), 404
+
+
 if __name__ == '__main__':
     app.run(debug=True)
