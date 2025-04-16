@@ -94,7 +94,7 @@ def create_user():
 
 #Créer une équipe 
 @app.route('/user/<username>/add', methods=['POST'])
-def add_pokemon_to_team(username):
+def toggle_pokemon_in_team(username):
     data = request.json
     pokemon_name = data.get('pokemon')
 
@@ -102,17 +102,23 @@ def add_pokemon_to_team(username):
     if not user:
         return jsonify({'error': 'User not found'}), 404
 
-    if len(user['team']) >= 6:
-        return jsonify({'error': 'Team already has 6 Pokémon'}), 400
+    team = user.get('team', [])
 
-    if pokemon_name in user['team']:
-        return jsonify({'error': 'Pokémon already in team'}), 400
+    if pokemon_name in team:
+        collection_users.update_one(
+            {'username': username},
+            {'$pull': {'team': pokemon_name}}
+        )
+        return jsonify({'message': f'{pokemon_name} removed from {username}\'s team'})
+    if len(team) >= 6:
+        return jsonify({'error': 'Team already has 6 Pokémon'}), 400
 
     collection_users.update_one(
         {'username': username},
         {'$push': {'team': pokemon_name}}
     )
     return jsonify({'message': f'{pokemon_name} added to {username}\'s team'})
+
 
 #Afficher l'user et son équipe 
 @app.route('/user/<username>', methods=['GET'])
