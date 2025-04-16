@@ -1,6 +1,8 @@
 from flask import Flask, jsonify, request
 from db import collection, collection_users
 from flask_cors import CORS
+import base64
+from bson.binary import Binary
 
 app = Flask(__name__)
 
@@ -17,10 +19,24 @@ def get_pokemon_by_page(page):
 
     pokemons = list(collection.find(query).skip(skip).limit(limit))
 
+    results = []  
+
     for p in pokemons:
         p['_id'] = str(p['_id'])
 
-    return jsonify(pokemons)
+        if 'Image' in p:
+            image_binary = p['Image']
+            try:
+                if isinstance(image_binary, (Binary, bytes)):
+                    p['Image'] = base64.b64encode(image_binary).decode('utf-8')
+                else:
+                    p['Image'] = None
+            except Exception:
+                p['Image'] = None
+
+        results.append(p)
+
+    return jsonify(results)
 
 
 #Route pour afficher les pokémons en fonction du nom 
