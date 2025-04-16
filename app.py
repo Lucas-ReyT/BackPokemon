@@ -3,7 +3,9 @@ from db import collection
 
 app = Flask(__name__)
 
-@app.route('/pokemon<int:page>', methods=['GET'])
+#Route pour afficher les pokémons par "page"
+#Ici, on affiche les 50 premiers pokémons
+@app.route('/page/<int:page>', methods=['GET'])
 def get_pokemon_by_page(page):
     limit = 50
     skip = (page - 1) * limit
@@ -14,7 +16,9 @@ def get_pokemon_by_page(page):
     
     return jsonify(pokemons)
 
-@app.route('/nom<string:pokemon_name>', methods=['GET'])
+
+#Route pour afficher les pokémons en fonction du nom 
+@app.route('/pokemon/<string:pokemon_name>', methods=['GET'])
 def get_pokemon_by_name(pokemon_name):
     pokemon = collection.find_one({'Name': {'$regex': f'^{pokemon_name}$', '$options': 'i'}})
     
@@ -23,6 +27,20 @@ def get_pokemon_by_name(pokemon_name):
         return jsonify(pokemon)
     else:
         return jsonify({'error': 'Pokemon not found'}), 404
+    
+#Route pour afficher le type du pokémon
+@app.route('/type/<string:type_name>', methods=['GET'])
+def get_pokemon_by_type(type_name):
+    
+    pokemons = list(collection.find({'Type': {'$regex': f'.*{type_name}.*', '$options': 'i'}}))
+    
+    for p in pokemons:
+        p['_id'] = str(p['_id'])
+    
+    if pokemons:
+        return jsonify(pokemons)
+    else:
+        return jsonify({'error': f'No Pokémon found with type {type_name}'}), 404
 
 
 
