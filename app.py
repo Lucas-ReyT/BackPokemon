@@ -3,6 +3,7 @@ from db import collection, collection_users
 from flask_cors import CORS
 import base64
 from bson.binary import Binary
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 
@@ -73,15 +74,22 @@ def get_pokemon_by_type(type_name):
 def create_user():
     data = request.json
     username = data.get('username')
+    password = data.get('password')
 
-    if not username:
-        return jsonify({'error': 'Username is required'}), 400
-    
-    # Vérifie si le pseudo existe déjà
+    if not username or not password:
+        return jsonify({'error': 'Username and password are required'}), 400
+
     if collection_users.find_one({'username': username}):
         return jsonify({'error': 'Username already exists'}), 400
-    
-    collection_users.insert_one({'username': username, 'team': []})
+
+    hashed_password = generate_password_hash(password)
+
+    collection_users.insert_one({
+        'username': username,
+        'password': hashed_password,
+        'team': []
+    })
+
     return jsonify({'message': f'User {username} created successfully'})
 
 #Créer une équipe 
@@ -117,7 +125,25 @@ def get_user(username):
         })
     else:
         return jsonify({'error': 'User not found'}), 404
+    
+#Se connecter à son compte
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
 
+    if not username or not password:
+        return jsonify({'error': 'Username and password are required'}), 400
+
+    user = collection_users.find_one({'username': username})
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    if not check_password_hash(user['password'], password):
+        return jsonify({'error': 'Incorrect password'}), 401
+
+    return jsonify({'message': f'Connexion de {username}'})
 
 if __name__ == '__main__':
     app.run(debug=True)
