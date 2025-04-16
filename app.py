@@ -1,9 +1,10 @@
 from flask import Flask, jsonify, request
-from db import collection, collection_users
+from db import collection, collection_users, type_collection
 from flask_cors import CORS
 import base64
 from bson.binary import Binary
 from werkzeug.security import generate_password_hash, check_password_hash
+from collections import defaultdict
 
 app = Flask(__name__)
 
@@ -41,41 +42,153 @@ def get_pokemon_by_page(page):
 
 
 #Route pour afficher les pokémons en fonction du nom 
+
+
 @app.route('/pokemon/<string:pokemon_name>', methods=['GET'])
 def get_pokemon_by_name(pokemon_name):
-    pokemon = collection.find_one({'Name': {'$regex': f'^{pokemon_name}$', '$options': 'i'}})
-    
-    if pokemon:
-        pokemon['_id'] = str(pokemon['_id'])
+    Check_Pokemon = collection.find_one({'Name': {'$regex': f'^{pokemon_name}$', '$options': 'i'}})
 
-        if 'Image' in pokemon:
-            image_binary = pokemon['Image']
-            try:
-                if isinstance(image_binary, (Binary, bytes)):
-                    pokemon['Image'] = base64.b64encode(image_binary).decode('utf-8')
+    if Check_Pokemon is None:
+        return jsonify({'error': f"Le Pokémon '{pokemon_name}' n'a pas été trouvé."}), 404
+
+    pokemon_types = Check_Pokemon.get('Type', [])
+    type_combined = {}
+
+    for t in pokemon_types:
+        type_info = type_collection.find_one({'Type': t})
+        if not type_info:
+            continue
+        for atk_type, multiplier in type_info.items():
+            if isinstance(multiplier, (int, float)):
+                if atk_type in type_combined:
+                    type_combined[atk_type] *= multiplier
                 else:
-                    pokemon['Image'] = None
-            except Exception:
-                pokemon['Image'] = None
+                    type_combined[atk_type] = multiplier
 
-        return jsonify(pokemon)
-    else:
-        return jsonify({'error': 'Pokemon not found'}), 404
+    faiblesses = {}
+    tres_faible = {}
+    resistances = {}
+    tres_resistant = {}
+    immunites = {}
+
+    for atk_type, multiplier in type_combined.items():
+        if multiplier > 2:
+            tres_faible[atk_type] = multiplier
+        elif multiplier > 1:
+            faiblesses[atk_type] = multiplier
+        elif multiplier == 0:
+            immunites[atk_type] = multiplier
+        elif multiplier < 0.5:
+            tres_resistant[atk_type] = multiplier
+        elif multiplier < 1:
+            resistances[atk_type] = multiplier
+
+    Check_Pokemon['_id'] = str(Check_Pokemon['_id'])
+
+    Check_Pokemon['efficacite_type'] = {}
+    if tres_faible:
+        Check_Pokemon['efficacite_type']['tres_faible'] = tres_faible
+    if faiblesses:
+        Check_Pokemon['efficacite_type']['faiblesses'] = faiblesses
+    if tres_resistant:
+        Check_Pokemon['efficacite_type']['tres_resistant'] = tres_resistant
+    if resistances:
+        Check_Pokemon['efficacite_type']['resistances'] = resistances
+    if immunites:
+        Check_Pokemon['efficacite_type']['immunites'] = immunites
+
+    # Ajout de l'image encodée si présente
+    if 'Image' in Check_Pokemon:
+        image_binary = Check_Pokemon['Image']
+        try:
+            if isinstance(image_binary, (Binary, bytes)):
+                Check_Pokemon['Image'] = base64.b64encode(image_binary).decode('utf-8')
+            else:
+                Check_Pokemon['Image'] = None
+        except Exception:
+            Check_Pokemon['Image'] = None
+
+    return jsonify(Check_Pokemon)
+
 #Route pour afficher le type du pokémon
+
+
 @app.route('/type/<string:type_name>', methods=['GET'])
 def get_pokemon_by_type(type_name):
-    
-    pokemons = list(collection.find({'Type': {'$regex': f'.*{type_name}.*', '$options': 'i'}}))
-    
+    # Cherche les Pokémon qui ont ce type dans leur liste de types
+    pokemons = list(collection.find({'Type': type_name.capitalize()}))
+
+    total_count = len(pokemons)
+    type_combinations = defaultdict(int)
+
     for p in pokemons:
-        p['_id'] = str(p['_id'])
-    
-    if pokemons:
-        return jsonify(pokemons)
-    else:
-        return jsonify({'error': f'No Pokémon found with type {type_name}'}), 404
+        types = p.get('Type', [])
+        if isinstance(types, str):  # Cas où Type serait une simple string
+            types = [types]
+        sorted_types = sorted(types)  # Pour que ['Feu', 'Vol'] == ['Vol', 'Feu']
+        type_key = " / ".join(sorted_types)
+        type_combinations[type_key] += 1
 
+    # Préparer la réponse
+    response = {
+        'type_recherche': type_name.capitalize(),
+        'nombre_total': total_count,
+        'combinaisons': dict(type_combinations)
+    }
 
+    return jsonify(response)
+
+#Par type et par stat
+
+@app.route('/filtre', methods=['GET'])
+def get_filtered_pokemons():
+    type_filter = request.args.get('type', default=None, type=str)
+    min_total = request.args.get('min_total', default=0, type=int)
+
+    stats_keys = [
+        'HP Base', 'Attack Base', 'Defense Base',
+        'Special Attack Base', 'Special Defense Base', 'Speed Base'
+    ]
+
+    query = {}
+    if type_filter:
+        query['Type'] = type_filter.capitalize()
+
+    pokemons = collection.find(query)
+    filtered = []
+
+    for p in pokemons:
+        try:
+            total = sum(int(p.get(stat, 0)) for stat in stats_keys)
+        except ValueError:
+            continue
+
+        if total >= min_total:
+            p['_id'] = str(p['_id'])
+            p['Total Base Stat'] = total
+            filtered.append(p)
+
+    return jsonify({
+        'type': type_filter,
+        'min_total': min_total,
+        'nombre_resultats': len(filtered),
+        'pokemons': filtered
+    })
+
+#Route qui affiche le total des types
+@app.route('/tottype', methods=['GET'])
+def get_all_types():
+    all_pokemons = collection.find()
+    unique_types = set()
+
+    for p in all_pokemons:
+        types = p.get('Type', [])
+        if isinstance(types, str):  
+            types = [types]
+        for t in types:
+            unique_types.add(t.capitalize())
+
+    return jsonify(sorted(list(unique_types)))
 
 
 
@@ -141,7 +254,9 @@ def get_user(username):
         })
     else:
         return jsonify({'error': 'User not found'}), 404
-    
+
+
+#Route pour chercher les pokémons par statistiques 
 @app.route('/statistiques', methods=['GET'])
 def get_pokemons_by_stats():
     min_total = request.args.get('min_total', default=0, type=int)
