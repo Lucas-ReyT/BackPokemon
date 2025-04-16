@@ -47,10 +47,20 @@ def get_pokemon_by_name(pokemon_name):
     
     if pokemon:
         pokemon['_id'] = str(pokemon['_id'])
+
+        if 'Image' in pokemon:
+            image_binary = pokemon['Image']
+            try:
+                if isinstance(image_binary, (Binary, bytes)):
+                    pokemon['Image'] = base64.b64encode(image_binary).decode('utf-8')
+                else:
+                    pokemon['Image'] = None
+            except Exception:
+                pokemon['Image'] = None
+
         return jsonify(pokemon)
     else:
         return jsonify({'error': 'Pokemon not found'}), 404
-    
 #Route pour afficher le type du pokémon
 @app.route('/type/<string:type_name>', methods=['GET'])
 def get_pokemon_by_type(type_name):
