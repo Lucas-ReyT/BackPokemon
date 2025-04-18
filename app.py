@@ -7,11 +7,12 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from collections import defaultdict
 
 app = Flask(__name__)
+CORS(app)
 
 #Route pour afficher les pokémons par "page"
 #Ici, on affiche les 50 premiers pokémons
 
-CORS(app)
+
 
 @app.route('/page/<int:page>', methods=['GET'])
 def get_pokemon_by_page(page):
@@ -115,7 +116,6 @@ def get_pokemon_by_name(pokemon_name):
 
 @app.route('/type/<string:type_name>', methods=['GET'])
 def get_pokemon_by_type(type_name):
-    # Cherche les Pokémon qui ont ce type dans leur liste de types
     pokemons = list(collection.find({'Type': type_name.capitalize()}))
 
     total_count = len(pokemons)
@@ -123,13 +123,11 @@ def get_pokemon_by_type(type_name):
 
     for p in pokemons:
         types = p.get('Type', [])
-        if isinstance(types, str):  # Cas où Type serait une simple string
+        if isinstance(types, str):  
             types = [types]
-        sorted_types = sorted(types)  # Pour que ['Feu', 'Vol'] == ['Vol', 'Feu']
+        sorted_types = sorted(types)  
         type_key = " / ".join(sorted_types)
         type_combinations[type_key] += 1
-
-    # Préparer la réponse
     response = {
         'type_recherche': type_name.capitalize(),
         'nombre_total': total_count,
@@ -139,6 +137,7 @@ def get_pokemon_by_type(type_name):
     return jsonify(response)
 
 #Par type et par stat
+
 
 @app.route('/filtre', methods=['GET'])
 def get_filtered_pokemons():
@@ -166,6 +165,17 @@ def get_filtered_pokemons():
         if total >= min_total:
             p['_id'] = str(p['_id'])
             p['Total Base Stat'] = total
+            
+            if 'Image' in p:
+                image_binary = p['Image']
+                try:
+                    if isinstance(image_binary, (Binary, bytes)):
+                        p['Image'] = base64.b64encode(image_binary).decode('utf-8')
+                    else:
+                        p['Image'] = None
+                except Exception:
+                    p['Image'] = None
+
             filtered.append(p)
 
     return jsonify({
